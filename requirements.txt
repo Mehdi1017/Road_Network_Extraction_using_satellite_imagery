@@ -1,0 +1,9 @@
+torch
+torchvision
+geopandas
+rasterio
+numpy
+scikit-image
+segmentation-models-pytorch
+albumentations
+tqdm

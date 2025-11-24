@@ -1,2 +1,5 @@
 AOI_2_Vegas
 AOI_2_Vegas_Roads_Test_Public
+test_results
+venv/
+__pycache__/
