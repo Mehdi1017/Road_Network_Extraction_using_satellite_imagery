@@ -4,3 +4,4 @@ test_results
 venv/
 __pycache__/
 *.pth
+models/
