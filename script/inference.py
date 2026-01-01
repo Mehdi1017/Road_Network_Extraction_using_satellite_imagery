@@ -13,11 +13,11 @@ from skimage.morphology import closing, square, remove_small_objects # <--- Add 
 # --- CONFIGURATION ---
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 # Update this to your specific saved model
-MODEL_PATH = "unet_resnet50_final.pth" 
-TEST_LIST = "test_list.txt"
+MODEL_PATH = "../models/unet_resnet50_final.pth" 
+TEST_LIST = "../src/test_list.txt"
 
 # Output folders
-OUTPUT_DIR = "test_results"
+OUTPUT_DIR = "../results/test_results"
 PRED_DIR = os.path.join(OUTPUT_DIR, "predictions")
 GT_DIR = os.path.join(OUTPUT_DIR, "ground_truth")
 
@@ -58,7 +58,7 @@ def run_inference():
             
             # 3. REMOVE SMALL OBJECTS (The Island Fix) 🏝️
             # Removes any isolated blob smaller than 500 pixels
-            pred_np = remove_small_objects(pred_np, min_size=500)
+            pred_np = remove_small_objects(pred_np, min_size=2000)
             
             # Prepare for saving
             pred_np = pred_np.astype(np.uint8) * 255

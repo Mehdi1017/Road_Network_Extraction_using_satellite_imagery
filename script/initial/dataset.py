@@ -14,8 +14,8 @@ class RoadDataset(Dataset):
         
         # --- 1. DEFINE PATHS (Guaranteed to run) ---
         # We hardcode these to match your verified folder structure
-        self.mask_dir = '/home/mehdi/thesis/AOI_2_Vegas/PS-RGB-Masks'
-        self.geojson_dir = '/home/mehdi/thesis/AOI_2_Vegas/geojson_roads'
+        self.mask_dir = '../../src/AOI_2_Vegas/PS-RGB-Masks'
+        self.geojson_dir = '../../src/AOI_2_Vegas/geojson_roads'
         
         # --- 2. LOAD IMAGE LIST ---
         if file_list_path:
@@ -66,15 +66,12 @@ class RoadDataset(Dataset):
                 # Strategy C: No label exists -> Empty Black Mask
                 mask = np.zeros((image.shape[1], image.shape[2]), dtype=np.uint8)
 
-        # 3. Robust Normalization (11-bit fix)
-        image = image.astype(np.float32)
-        p2, p98 = np.percentile(image, (2, 98))
-        image = np.clip(image, p2, p98)
-        
-        if p98 - p2 > 0:
-            image = (image - p2) / (p98 - p2)
-        else:
-            image = image / 2047.0
+        # 3. Fixed Normalization (Safer for Transformers)
+        # SpaceNet 3 is 11-bit data (0-2047). 
+        # We simply divide by 2048 to map it to 0-1.
+        # This preserves the natural "darkness" of shadows/desert 
+        # and prevents noise amplification.
+        image = image.astype(np.float32) / 2048.0
             
         # Cast to float32 for OpenCV/Albumentations compatibility
         image = image.astype(np.float32)

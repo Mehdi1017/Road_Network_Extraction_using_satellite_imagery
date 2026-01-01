@@ -5,7 +5,7 @@ import numpy as np
 import os
 import cv2
 from torch.utils.data import DataLoader
-from dataset import RoadDataset
+from initial.dataset import RoadDataset
 from model import get_model
 
 # --- THESIS CONFIGURATION ---
@@ -14,10 +14,10 @@ from model import get_model
 # Experiment 2: SegFormer (ARCHITECTURE='segformer', ENCODER='mit_b3')
 # Experiment 3: Hybrid Transformer (ARCHITECTURE='unet', ENCODER='mit_b3')
 
-ARCHITECTURE = 'segformer'    # Options: 'unet', 'segformer'
-ENCODER = 'mit_b3'            # Options: 'resnet50', 'mit_b3'
+ARCHITECTURE = 'deeplabv3plus'    # Options: 'unet', 'segformer'
+ENCODER = 'resnet50'            # Options: 'resnet50', 'mit_b3'
 
-DATA_DIR = '/home/mehdi/thesis/AOI_2_Vegas' 
+DATA_DIR = '../src/AOI_2_Vegas' 
 EPOCHS = 25
 BATCH_SIZE = 4                
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -47,28 +47,23 @@ val_dataset = RoadDataset(file_list_path="val_list.txt", transform=val_transform
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True)
 val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
 
+print(f"Training samples: {len(train_dataset)} | Validation samples: {len(val_dataset)}")
+
 # --- 3. MODEL SETUP ---
 print(f"Initializing {ARCHITECTURE} with {ENCODER} backbone...")
 model = get_model(ARCHITECTURE, ENCODER).to(DEVICE)
 
-# --- 4. SMART CONFIGURATION (The "Brain" of the script) ---
-# Automatically chooses the best settings based on the architecture type.
-
+# --- 4. SMART CONFIGURATION ---
 if ARCHITECTURE == 'segformer':
     print(">>> MODE: TRANSFORMER DETECTED")
-    print(" - Optimizer: AdamW (Prevent collapse)")
-    print(" - Loss: Standard BCE (Natural balance)")
-    print(" - AMP: DISABLED (Stability)")
+    print(" - Optimizer: AdamW (Standard)")
+    print(" - Loss: BCEWithLogitsLoss")
     
-    # 1. Optimizer: AdamW is required for Transformers
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-2)
+    # Standard fine-tuning LR for SegFormer
+    optimizer = torch.optim.AdamW(model.parameters(), lr=6e-5, weight_decay=1e-2)
     
-    # 2. Loss: Standard BCEWithLogitsLoss
-    # We REMOVE pos_weight to stop the model from getting stuck at 0.5 probability
     loss_fn_internal = torch.nn.BCEWithLogitsLoss() 
-    
-    # 3. AMP: Disabled for stability
-    use_amp = False
+    use_amp = False # Keep disabled for now
     
     def loss_fn(logits, targets):
         return loss_fn_internal(logits, targets)
