@@ -7,7 +7,7 @@ import geopandas as gpd
 from rasterio.features import rasterize
 from tqdm import tqdm
 
-DATA_DIR = './AOI_2_Vegas'
+DATA_DIR = '../../src/AOI_2_Vegas'
 MASK_DIR = os.path.join(DATA_DIR, 'PS-RGB-Masks')
 os.makedirs(MASK_DIR, exist_ok=True)
 

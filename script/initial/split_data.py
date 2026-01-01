@@ -3,7 +3,7 @@ import glob
 import random
 
 # Define your data root
-DATA_ROOT = "/home/mehdi/thesis/AOI_2_Vegas" # Update when you add more cities
+DATA_ROOT = "../../src/AOI_2_Vegas" # Update when you add more cities
 
 # Find all available images (PS-RGB)
 all_images = glob.glob(os.path.join(DATA_ROOT, "PS-RGB", "*.tif"))

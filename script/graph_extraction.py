@@ -12,8 +12,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # --- CONFIG ---
-PRED_DIR = "test_results/predictions"
-GT_DIR = "test_results/ground_truth"
+PRED_DIR = "../results/test_results_transformer/predictions"
+GT_DIR = "../results/test_results_resnet50/ground_truth"
 NUM_CONTROL_POINTS = 50
 
 # CRESI-based parameters (assuming ~30cm/pixel resolution)
@@ -44,7 +44,7 @@ def mask_to_graph(mask_path, refine=False):
     ske = skeletonize(mask).astype(np.uint16)
 
     # 5. Build Initial Graph
-    graph = sknw.build_sknw(ske)
+    graph = sknw.build_sknw(ske, multi=True)
     
     # 6. Graph Refinement (The "Secret Sauce" of CRESI)
     if refine:
@@ -70,35 +70,45 @@ def refine_graph(G):
             G.remove_nodes_from(comp)
 
     # 2. Connect Dead Ends (Terminal Vertices)
-    # Find all "dead end" nodes (degree 1)
-    #  "connect terminal vertices if the distance... is less than 6 meters"
-    node_coords = {n: d['o'] for n, d in G.nodes(data=True)}
-    
     # Run multiple passes to close sequential gaps
     for _ in range(2): 
         # Identify degree-1 nodes
         dead_ends = [n for n in G.nodes() if G.degree(n) == 1]
         if not dead_ends: break
             
-        # Build a spatial tree of ALL nodes to query neighbors
+        # Build a spatial tree of ALL nodes ONCE per pass
         all_nodes = list(G.nodes())
         if len(all_nodes) < 2: break
         
+        # Safe coordinate extraction
+        # sknw stores coordinates as numpy arrays in the 'o' attribute
+        # We need to stack them into a (N, 2) array for cKDTree
+        node_coords = {n: d['o'] for n, d in G.nodes(data=True)}
         coords = np.array([node_coords[n] for n in all_nodes])
+        
+        if len(coords) == 0: break
+
         tree = cKDTree(coords)
         
         for n_id in dead_ends:
+            if n_id not in G: continue # Might have been removed or merged
+
             # Current node coordinates
             curr_coord = node_coords[n_id]
             
             # Find neighbors within threshold (CONNECT_THRESHOLD = 6 meters)
-            dists, idxs = tree.query(curr_coord, k=5, distance_upper_bound=CONNECT_THRESHOLD)
+            # k=5 finds the 5 nearest neighbors
+            dists, idxs = tree.query(curr_coord.reshape(1, -1), k=5, distance_upper_bound=CONNECT_THRESHOLD)
             
-            # Filter results (k-nearest returns lists)
-            # We skip index 0 because it's the node itself (dist=0)
+            # tree.query returns arrays if input is array, flatten them
+            dists = dists[0]
+            idxs = idxs[0]
+
             valid_neighbors = []
             for d, i in zip(dists, idxs):
-                if i >= len(all_nodes): continue # cKDTree returns out-of-bounds for no match
+                if i >= len(all_nodes): continue # cKDTree returns out-of-bounds for no match (infinity distance)
+                if d == float('inf'): continue
+
                 neighbor_id = all_nodes[i]
                 
                 # Don't connect to self or existing neighbors
