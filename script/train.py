@@ -9,22 +9,16 @@ from initial.dataset import RoadDataset
 from model import get_model
 
 # --- THESIS CONFIGURATION ---
-# Change these lines to switch experiments
-# Experiment 1: ResNet Baseline (ARCHITECTURE='unet', ENCODER='resnet50')
-# Experiment 2: SegFormer (ARCHITECTURE='segformer', ENCODER='mit_b3')
-# Experiment 3: Hybrid Transformer (ARCHITECTURE='unet', ENCODER='mit_b3')
-
-ARCHITECTURE = 'deeplabv3plus'    # Options: 'unet', 'segformer'
+ARCHITECTURE = 'unet'         
 ENCODER = 'resnet50'            # Options: 'resnet50', 'mit_b3'
 
 DATA_DIR = '../src/AOI_2_Vegas' 
-EPOCHS = 25
-BATCH_SIZE = 4                
+EPOCHS = 100                  # Increased max epochs because we have Early Stopping
+BATCH_SIZE = 4
+PATIENCE = 10                 # Stop if no improvement for 10 epochs
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # --- 1. DATA TRANSFORMS ---
-# Normalization with max_pixel_value=1.0 is CRITICAL for 0-1 float images.
-# Without this, albumentations assumes 0-255 and destroys the data.
 train_transform = A.Compose([
     A.RandomCrop(width=512, height=512),
     A.HorizontalFlip(p=0.5),
@@ -40,48 +34,39 @@ val_transform = A.Compose([
 ])
 
 # --- 2. DATASETS ---
-# Ensure you have generated these list files with split_data.py
-train_dataset = RoadDataset(file_list_path="train_list.txt", transform=train_transform)
-val_dataset = RoadDataset(file_list_path="val_list.txt", transform=val_transform)
+train_dataset = RoadDataset(file_list_path="../src/train_list.txt", transform=train_transform)
+val_dataset = RoadDataset(file_list_path="../src/val_list.txt", transform=val_transform)
 
 train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True)
 val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4, pin_memory=True)
-
-print(f"Training samples: {len(train_dataset)} | Validation samples: {len(val_dataset)}")
 
 # --- 3. MODEL SETUP ---
 print(f"Initializing {ARCHITECTURE} with {ENCODER} backbone...")
 model = get_model(ARCHITECTURE, ENCODER).to(DEVICE)
 
 # --- 4. SMART CONFIGURATION ---
-if ARCHITECTURE == 'segformer':
-    print(">>> MODE: TRANSFORMER DETECTED")
-    print(" - Optimizer: AdamW (Standard)")
+if 'mit' in ENCODER:
+    print(">>> MODE: TRANSFORMER BACKBONE DETECTED")
+    print(" - Optimizer: AdamW")
     print(" - Loss: BCEWithLogitsLoss")
+    print(" - AMP: DISABLED")
     
-    # Standard fine-tuning LR for SegFormer
     optimizer = torch.optim.AdamW(model.parameters(), lr=6e-5, weight_decay=1e-2)
-    
     loss_fn_internal = torch.nn.BCEWithLogitsLoss() 
-    use_amp = False # Keep disabled for now
+    use_amp = False 
     
     def loss_fn(logits, targets):
         return loss_fn_internal(logits, targets)
 
 else:
-    print(">>> MODE: CNN DETECTED")
-    print(" - Optimizer: Adam (Fast convergence)")
-    print(" - Loss: Dice + Focal (Sharp boundaries)")
-    print(" - AMP: ENABLED (Speed)")
+    print(">>> MODE: CNN BACKBONE DETECTED")
+    print(" - Optimizer: Adam")
+    print(" - Loss: Dice + Focal")
+    print(" - AMP: ENABLED")
     
-    # 1. Optimizer: Standard Adam works best for ResNets
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    
-    # 2. Loss: Dice + Focal
     dice_loss = smp.losses.DiceLoss(mode='binary', from_logits=True)
     focal_loss = smp.losses.FocalLoss(mode='binary')
-    
-    # 3. AMP: Enabled
     use_amp = True
     
     def loss_fn(logits, targets):
@@ -96,12 +81,12 @@ scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer, 
     max_lr=1e-4, 
     total_steps=total_steps, 
-    pct_start=0.1, # Warmup for first 10%
+    pct_start=0.1, 
     div_factor=10, 
     final_div_factor=100
 )
 
-scaler = torch.amp.GradScaler('cuda') # Only used if use_amp=True
+scaler = torch.amp.GradScaler('cuda') 
 
 def compute_iou(preds, masks, threshold=0.5):
     preds = (preds > threshold).float()
@@ -111,9 +96,11 @@ def compute_iou(preds, masks, threshold=0.5):
     iou = (intersection + 1e-6) / (union + 1e-6)
     return iou.mean().item()
 
-# --- 6. TRAINING LOOP ---
-print(f"Starting training... (AMP Enabled: {use_amp})")
+# --- 6. TRAINING LOOP (With Early Stopping) ---
+print(f"Starting training... (AMP: {use_amp}, Early Stopping Patience: {PATIENCE})")
+
 best_iou = 0.0
+patience_counter = 0
 
 for epoch in range(EPOCHS):
     model.train()
@@ -122,26 +109,23 @@ for epoch in range(EPOCHS):
     for i, (images, masks) in enumerate(train_loader):
         images, masks = images.to(DEVICE), masks.to(DEVICE)
         
-        # --- FORWARD PASS ---
+        # Forward
         if use_amp:
             with torch.amp.autocast('cuda'):
                 logits = model(images)
                 loss = loss_fn(logits, masks)
-            
             optimizer.zero_grad()
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
         else:
-            # Standard FP32 Training (Best for SegFormer Stability)
             logits = model(images)
             loss = loss_fn(logits, masks)
-            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
         
-        # --- DEBUG PRINT (First batch of every epoch) ---
+        # Debug Print
         if i == 0:
             probs = logits.sigmoid()
             p_mean = probs.mean().item()
@@ -176,10 +160,20 @@ for epoch in range(EPOCHS):
 
     print(f"Epoch {epoch+1}/{EPOCHS} | Train Loss: {avg_train_loss:.4f} | Val IoU: {avg_val_iou:.4f}")
     
+    # --- EARLY STOPPING LOGIC ---
     if avg_val_iou > best_iou:
         best_iou = avg_val_iou
+        patience_counter = 0  # Reset counter
         torch.save(model.state_dict(), f'{ARCHITECTURE}_{ENCODER}_best.pth')
         print(f"  --> New Best Model Saved! ({best_iou:.4f})")
+    else:
+        patience_counter += 1
+        print(f"  ... No improvement. Patience: {patience_counter}/{PATIENCE}")
+        
+        if patience_counter >= PATIENCE:
+            print(f"\n🛑 EARLY STOPPING TRIGGERED at Epoch {epoch+1}")
+            print(f"Best Validation IoU: {best_iou:.4f}")
+            break
 
 print("Training finished.")
 torch.save(model.state_dict(), f'{ARCHITECTURE}_{ENCODER}_final.pth')

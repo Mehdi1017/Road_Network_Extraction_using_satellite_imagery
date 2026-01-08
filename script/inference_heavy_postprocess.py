@@ -17,11 +17,11 @@ from model import get_model
 
 # Output folders
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-MODEL_PATH = "../models/unet_resnet50_final.pth" 
+MODEL_PATH = "./unet_mit_b3_best.pth" 
 TEST_LIST = "../src/test_list.txt"
 
 # Output folders
-OUTPUT_DIR = "../results/test_results_resnet50" # Changed folder name to avoid overwriting
+OUTPUT_DIR = "../results/test_results_mit_b3_earlystopping" # Changed folder name to avoid overwriting
 PRED_DIR = os.path.join(OUTPUT_DIR, "predictions")
 GT_DIR = os.path.join(OUTPUT_DIR, "ground_truth")
 
@@ -30,7 +30,7 @@ os.makedirs(GT_DIR, exist_ok=True)
 
 def run_inference():
     print(f"Loading model: {MODEL_PATH}")
-    model = get_model('unet', 'resnet50').to(DEVICE)
+    model = get_model('unet', 'mit_b3').to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH))
     model.eval()
 

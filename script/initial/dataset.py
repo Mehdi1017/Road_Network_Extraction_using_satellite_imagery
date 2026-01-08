@@ -14,8 +14,8 @@ class RoadDataset(Dataset):
         
         # --- 1. DEFINE PATHS (Guaranteed to run) ---
         # We hardcode these to match your verified folder structure
-        self.mask_dir = '../../src/AOI_2_Vegas/PS-RGB-Masks'
-        self.geojson_dir = '../../src/AOI_2_Vegas/geojson_roads'
+        self.mask_dir = '../src/AOI_2_Vegas/PS-RGB-Masks'
+        self.geojson_dir = '../src/AOI_2_Vegas/geojson_roads'
         
         # --- 2. LOAD IMAGE LIST ---
         if file_list_path:
@@ -25,7 +25,7 @@ class RoadDataset(Dataset):
                 
         elif data_root:
             # Quick Test mode: Scan folder
-            self.image_files = glob.glob(os.path.join(data_root, 'PS-RGB', '*.tif'))
+            self.image_files = glob.glob(os.path.join(data_root, 'PS-RGB', 'src', '*.tif'))
             
         else:
             raise ValueError("Must provide either file_list_path or data_root")

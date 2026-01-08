@@ -5,25 +5,25 @@ from torch.utils.data import DataLoader
 from PIL import Image
 from tqdm import tqdm
 import albumentations as A
+import sys
 
-# Import your custom modules
-from dataset import RoadDataset
+from initial.dataset import RoadDataset
 from model import get_model
 
 # --- CONFIGURATION ---
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 # Use your best model (ResNet or Transformer)
-MODEL_PATH = "unet_resnet50_final.pth" 
-TEST_LIST = "test_list.txt"
+MODEL_PATH = "../models/unet_mit_b3_best.pth" 
+TEST_LIST = "../src/test_list.txt"
 
 # Save to a specific folder so we don't overwrite good results
-OUTPUT_DIR = "thesis_visuals/raw_output_resnet50"
+OUTPUT_DIR = "../results/thesis_visuals/raw_output_mit_b3_earlystopping"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def generate_raw_images():
     print(f"Loading model: {MODEL_PATH}")
     # Update architecture/encoder to match your saved model
-    model = get_model('unet', 'resnet50').to(DEVICE)
+    model = get_model('unet', 'mit_b3').to(DEVICE)
     model.load_state_dict(torch.load(MODEL_PATH))
     model.eval()
 
