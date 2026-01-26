@@ -25,7 +25,8 @@ class RoadDataset(Dataset):
                 
         elif data_root:
             # Quick Test mode: Scan folder
-            self.image_files = glob.glob(os.path.join(data_root, 'PS-RGB', 'src', '*.tif'))
+            print(os.path.join(data_root, 'PS-RGB', '*.tif'))
+            self.image_files = glob.glob(os.path.join(data_root, 'PS-RGB', '*.tif'))
             
         else:
             raise ValueError("Must provide either file_list_path or data_root")

@@ -10,7 +10,7 @@ from model import get_model
 
 # --- THESIS CONFIGURATION ---
 ARCHITECTURE = 'unet'         
-ENCODER = 'resnet50'            # Options: 'resnet50', 'mit_b3'
+ENCODER = 'mit_b3'            # Options: 'resnet50', 'mit_b3'
 
 DATA_DIR = '../src/AOI_2_Vegas' 
 EPOCHS = 100                  # Increased max epochs because we have Early Stopping
@@ -51,9 +51,11 @@ if 'mit' in ENCODER:
     print(" - Loss: BCEWithLogitsLoss")
     print(" - AMP: DISABLED")
     
-    optimizer = torch.optim.AdamW(model.parameters(), lr=6e-5, weight_decay=1e-2)
-    loss_fn_internal = torch.nn.BCEWithLogitsLoss() 
-    use_amp = True 
+    optimizer = torch.optim.AdamW(model.parameters(), lr=4.87e-4, weight_decay=3.36e-6)
+    pos_weight = torch.tensor([2.7]).to(DEVICE) 
+    loss_fn_internal = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight) 
+    use_amp = True
+    
     
     def loss_fn(logits, targets):
         return loss_fn_internal(logits, targets)
@@ -79,9 +81,9 @@ else:
 total_steps = EPOCHS * len(train_loader)
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer, 
-    max_lr=1e-4, 
+    max_lr=4.87e-4, 
     total_steps=total_steps, 
-    pct_start=0.1, 
+    pct_start=0.44, 
     div_factor=10, 
     final_div_factor=100
 )
@@ -176,4 +178,3 @@ for epoch in range(EPOCHS):
             break
 
 print("Training finished.")
-torch.save(model.state_dict(), f'{ARCHITECTURE}_{ENCODER}_final.pth')

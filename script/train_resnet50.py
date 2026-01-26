@@ -14,8 +14,8 @@ ENCODER = 'resnet50'            # Options: 'resnet50', 'mit_b3'
 
 DATA_DIR = '../src/AOI_2_Vegas' 
 EPOCHS = 100                  # Increased max epochs because we have Early Stopping
-BATCH_SIZE = 2
-PATIENCE = 10                 # Stop if no improvement for 10 epochs
+BATCH_SIZE = 4
+PATIENCE = 30                 # Stop if no improvement for 10 epochs
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # --- 1. DATA TRANSFORMS ---
@@ -37,8 +37,8 @@ val_transform = A.Compose([
 train_dataset = RoadDataset(file_list_path="../src/train_list.txt", transform=train_transform)
 val_dataset = RoadDataset(file_list_path="../src/val_list.txt", transform=val_transform)
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=2, pin_memory=True)
-val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=2, pin_memory=True)
+train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=1, pin_memory=True)
+val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=1, pin_memory=True)
 
 # --- 3. MODEL SETUP ---
 print(f"Initializing {ARCHITECTURE} with {ENCODER} backbone...")
@@ -64,7 +64,7 @@ else:
     print(" - Loss: Dice + Focal")
     print(" - AMP: ENABLED")
     
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(), lr=3.54e-4, weight_decay=1.8e-5)
     dice_loss = smp.losses.DiceLoss(mode='binary', from_logits=True)
     focal_loss = smp.losses.FocalLoss(mode='binary')
     use_amp = True
@@ -73,13 +73,13 @@ else:
         d_loss = dice_loss(logits, targets)
         probs = logits.sigmoid()
         f_loss = focal_loss(probs, targets)
-        return (0.75 * f_loss) + (0.25 * d_loss)
+        return (0.9 * f_loss) + (0.1 * d_loss)
 
 # --- 5. SCHEDULER ---
 total_steps = EPOCHS * len(train_loader)
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer, 
-    max_lr=1e-4, 
+    max_lr=3.54e-4, 
     total_steps=total_steps, 
     pct_start=0.1, 
     div_factor=10, 
@@ -118,11 +118,21 @@ for epoch in range(EPOCHS):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+
+            # --- SAFETY FIX: GRADIENT CLIPPING ---
+            scaler.unscale_(optimizer) # Important: Unscale before clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            # -------------------------------------
         else:
             logits = model(images)
             loss = loss_fn(logits, masks)
             optimizer.zero_grad()
             loss.backward()
+
+            # --- SAFETY FIX ---
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            # ------------------
+
             optimizer.step()
         
         # Debug Print
