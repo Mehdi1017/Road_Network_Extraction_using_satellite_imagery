@@ -12,7 +12,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # --- CONFIG ---
-PRED_DIR = "../results/test_results_filin_masks"
+PRED_DIR = "../results/test_results_mit_b3_merge_postprocess"
 GT_DIR = "../results/test_results_resnet50_de_parameters/ground_truth"
 NUM_CONTROL_POINTS = 50
 

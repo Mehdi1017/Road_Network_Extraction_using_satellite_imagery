@@ -16,6 +16,7 @@ import albumentations as A
 
 from initial.dataset import RoadDataset
 from model import get_model
+from train_d3s2pp import DeepLabV3PlusD3S2PP
 
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -112,7 +113,7 @@ def save_graph_as_mask(graph, shape, save_path):
 
 def run_inference():
     print(f"Loading model: {MODEL_PATH}")
-    model = get_model('unet', 'mit_b3').to(DEVICE)
+    model = DeepLabV3PlusD3S2PP(encoder_name="resnet50", classes=1).to(DEVICE)
     if os.path.exists(MODEL_PATH):
         model.load_state_dict(torch.load(MODEL_PATH))
     else:
