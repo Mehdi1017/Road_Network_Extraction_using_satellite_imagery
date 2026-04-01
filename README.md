@@ -46,6 +46,44 @@ pip install -r requirements.txt
 # Run inference on a sample image
 python predict.py --input samples/mumbai_sample.tif --model mit_b3
 ```
+## 💻 Usage Guide
+
+This repository uses modular entry-point scripts. You can see all available arguments for any script by passing the `--help` flag (e.g., `python train.py --help`).
+
+### 1. Data Preprocessing
+Convert the raw SpaceNet GeoJSON labels into 2-meter buffered raster masks. This script automatically processes all city directories found in `data/raw/`.
+
+```bash
+python src/data_prep/preprocess.py
+```
+
+### 2. Data Splitting
+Generate the training, validation, and testing lists. The script writes relative paths to `data/splits/`.
+
+```bash
+# Generate both Combined and Per-City splits (Default)
+python src/data_prep/split_data.py 
+
+# Generate ONLY the combined cross-city splits
+python src/data_prep/split_data.py --mode combined --ratio 0.8
+```
+
+### 3. Model Training
+Train the network architectures. The script automatically handles loss function switching, learning rate scheduling, and early stopping.
+
+```bash
+# Baseline: Train ResNet50 with standard Pixel Loss (BCE/Dice)
+python train.py --model resnet50 --loss pixel --batch_size 4 --epochs 100
+
+# Thesis Contribution: Train custom D3S2PP with Topology-Aware Loss
+python train.py --model d3s2pp --loss topo --epochs 100 --warmup 5
+
+# Transformer: Train SegFormer MiT-B3 
+python train.py --model mit_b3 --loss topo --batch_size 4
+
+# Resume a crashed or stopped training run
+python train.py --model mit_b3 --loss topo --resume
+```
 
 ## 📊 Results (Vegas)
 
