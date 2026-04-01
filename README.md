@@ -1,0 +1,76 @@
+# Road Network Detection and Route Travel Time Estimation from Satellite Imagery
+
+This repository contains the implementation of my Master's Thesis for the **Erasmus Mundus Master in Geospatial Technologies**. The project addresses the "Topology Gap" in automated road extraction by contrasting hierarchical Transformers against optimized CNN architectures.
+
+## 🌟 Key Highlights
+
+* **Architectural Comparison:** Contrast between **SegFormer (MiT-B3)** with Self-Attention and **DeepLabV3+** with a custom **D3S2PP** module.
+* **Topological Repair:** Integrated geometric post-processing heuristics (Filin et al. & Li et al.) to ensure network connectivity.
+* **Advanced Evaluation:** Evaluation framework utilizing **APLS (Average Path Length Similarity)** and **Weisfeiler-Lehman (WL) Subtree Kernels** to measure structural isomorphism.
+
+## 🛠️ Methodology
+
+The pipeline consists of four main stages:
+
+1. **Data Preparation:** Radiometric normalization of 11-bit SpaceNet imagery and buffer rasterization.
+2. **Feature Extraction:** Hierarchical encoding using Self-Attention (global context) vs. Atrous Convolutions (local context).
+3. **Graph Extraction:** Skeletonization and vectorization of probability masks.
+4. **Network Evaluation:** Functional routing analysis beyond standard pixel-wise metrics (IoU).
+
+## 📂 Repository Structure
+
+```text
+├── models/             # SegFormer (MiT-B3) and DeepLabV3+ w/ D3S2PP
+├── post_processing/    # Heuristics for topology repair (Filin, Li)
+├── utils/              # Metrics: APLS, WL-Kernel, and IoU calculations
+├── weights/            # (Download links in README)
+├── samples/            # Sample imagery for quick-start inference
+├── main.py             # Training entry point
+└── predict.py          # Inference and vectorization script
+```
+
+## 🚀 Quick Start
+
+```bash
+# Clone the repository
+git clone https://github.com/Mehdi1017/Road_Network_Extraction_using_satellite_imagery.git
+cd Road_Network_Extraction_using_satellite_imagery
+
+# Create and activate a virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run inference on a sample image
+python predict.py --input samples/mumbai_sample.tif --model mit_b3
+```
+
+## 📊 Results (Vegas)
+
+| Model | IoU | APLS | WL-Kernel | APLS_Time |
+| :--- | :---: | :---: | :---: | :---: |
+| ResNet50 + D3S2PP | 0.45 | 0.64 | 0.82 | 0.46 |
+| **MiT-B3 + Unet** | **0.35** | **0.78** | **0.85** | **0.40** |
+
+## 🎓 Citation
+
+```bibtex
+@mastersthesis{gassa2026road,
+  author  = {Gassa Malki, El Mehdi},
+  title   = {Road Network Detection and Route Travel Time Estimation from Satellite Imagery},
+  school  = {Erasmus Mundus Master in Geospatial Technologies},
+  year    = {2026}
+}
+```
+
+## 📄 License
+
+Distributed under the MIT License.
+
+## 📬 Contact & Acknowledgements
+
+**El Mehdi Gassa Malki** - [LinkedIn](https://www.linkedin.com/in/el-mehdi-gassa-malki) - mehdigassamalki@gmail.com
+
+Special thanks to my thesis supervisors Filipe Feitosa, Marco Painho, and Marcia Baptista, as well as the Erasmus Mundus GeoTech program for their support.
