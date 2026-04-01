@@ -1,4 +1,3 @@
-# src/data_prep/preprocess.py
 import argparse
 from pathlib import Path
 import numpy as np
@@ -85,7 +84,7 @@ def process_city(city_dir: Path):
 def main():
     parser = argparse.ArgumentParser(description="Batch preprocess SpaceNet GeoJSONs into raster masks.")
     
-    # Default to the data/raw folder at the root of the project
+
     project_root = Path(__file__).resolve().parent.parent.parent
     default_data_dir = project_root / "data" / "raw"
     
@@ -98,19 +97,19 @@ def main():
     if not data_root.exists():
         raise FileNotFoundError(f"Data directory not found at {data_root}. Please check your paths.")
         
-    print(f"🔍 Scanning for city datasets in: {data_root}")
+    print(f"Scanning for city datasets in: {data_root}")
     
-    # Find all subdirectories inside data/raw (e.g., Mumbai, Vegas, Paris, Khartoum)
+    # Find all subdirectories inside data/raw (e.g., Shanghai, Vegas, Paris, Khartoum)
     city_folders = [f for f in data_root.iterdir() if f.is_dir()]
     
     if not city_folders:
-        print("❌ No city folders found.")
+        print("No city folders found.")
         return
         
     for city_dir in city_folders:
         process_city(city_dir)
         
-    print("\n✅ All cities preprocessed successfully!")
+    print("\n All cities preprocessed successfully!")
 
 if __name__ == "__main__":
     main()
