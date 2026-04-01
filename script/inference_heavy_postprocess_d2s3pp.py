@@ -13,7 +13,7 @@ from skimage.filters import median
 # Import your custom modules
 from initial.dataset import RoadDataset
 from model import get_model
-from train_d3s2pp import DeepLabV3PlusD3S2PP
+from script.old.train_d3s2pp import DeepLabV3PlusD3S2PP
 
 
 # Output folders

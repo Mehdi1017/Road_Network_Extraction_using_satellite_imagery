@@ -6,27 +6,48 @@ from PIL import Image
 from tqdm import tqdm
 import albumentations as A
 import sys
-
+# Import D3S2PP class if needed
+from script.old.train_d3s2pp import DeepLabV3PlusD3S2PP
 from initial.dataset import RoadDataset
 from model import get_model
 
 # --- CONFIGURATION ---
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-# Use your best model (ResNet or Transformer)
-MODEL_PATH = "../models/unet_mit_b3_best.pth" 
-TEST_LIST = "../src/test_list.txt"
 
-# Save to a specific folder so we don't overwrite good results
-OUTPUT_DIR = "../results/thesis_visuals/raw_output_mit_b3_earlystopping"
+# SELECT MODEL AND CITY HERE
+MODEL_TYPE = 'unet_mit_topo' # 'unet_mit' or 'd3s2pp' or 'resnet50'
+CITY_NAME = "AOI_5_Khartoum" # "AOI_2_Vegas", "AOI_3_Paris", "AOI_4_Shanghai", "AOI_5_Khartoum"
+
+# Define Paths based on selection
+if MODEL_TYPE == 'unet_mit_topo':
+    MODEL_PATH = os.path.join("topo_unet_mit_b3_best.pth")
+    ENCODER = 'mit_b3'
+elif MODEL_TYPE == 'resnet50':
+    MODEL_PATH = os.path.join("unet_resnet50_best_4cities.pth") # Adjust name
+    ENCODER = 'resnet50'
+elif MODEL_TYPE == 'd3s2pp':
+        MODEL_PATH = os.path.join("d3s2pp_resnet50_best_4cities.pth")
+        
+
+TEST_LIST = os.path.join(f"../src/test_list_{CITY_NAME}_full.txt")
+OUTPUT_DIR = os.path.join(f"../results/raw_predictions_labeled/{MODEL_TYPE}/{CITY_NAME}")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def generate_raw_images():
+    if MODEL_TYPE == 'd3s2pp':
+        model = DeepLabV3PlusD3S2PP(encoder_name="resnet50", classes=1).to(DEVICE)
+    else:
+        # Update architecture/encoder to match your saved model
+        model = get_model('unet', ENCODER).to(DEVICE)
+    if MODEL_TYPE == 'unet_mit_topo':
+        checkpoint = torch.load(MODEL_PATH, map_location=DEVICE)
+        model.load_state_dict(checkpoint['model'])
+    else:
+        model.load_state_dict(torch.load(MODEL_PATH))
+    model.eval() 
+    
+    
     print(f"Loading model: {MODEL_PATH}")
-    # Update architecture/encoder to match your saved model
-    model = get_model('unet', 'mit_b3').to(DEVICE)
-    model.load_state_dict(torch.load(MODEL_PATH))
-    model.eval()
-
     # Transforms (Must match training!)
     test_transform = A.Compose([
         A.PadIfNeeded(min_height=1312, min_width=1312, border_mode=0), 
@@ -44,10 +65,20 @@ def generate_raw_images():
             #if i >= 10: break
             
             image = image.to(DEVICE)
-            
+            orig_h, orig_w = 1300, 1300
             # Forward Pass
             with torch.amp.autocast('cuda'):
                 logits = model(image)
+                # 2. FORCE RESIZE to Original Dimensions
+                # This fixes the "zoomed in" or "wrong resolution" issue
+                # We resize the logits directly to (orig_h, orig_w)
+                logits = torch.nn.functional.interpolate(
+                    logits, 
+                    size=(orig_h, orig_w), 
+                    mode='bilinear', 
+                    align_corners=False
+                )
+                
                 probs = logits.sigmoid()
             
             # --- NO POST-PROCESSING HERE ---

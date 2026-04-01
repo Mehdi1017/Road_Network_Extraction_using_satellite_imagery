@@ -16,23 +16,34 @@ import albumentations as A
 import rasterio 
 from initial.dataset import RoadDataset
 from model import get_model
-from train_d3s2pp import DeepLabV3PlusD3S2PP
+from script.old.train_d3s2pp import DeepLabV3PlusD3S2PP
 
-
+CITY_NAME = "AOI_8_Mumbai" # Change this to your city name (e.g. AOI_2_Vegas, AOI_3_Paris, AOI_4_Shanghai)
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
-MODEL_PATH = "./d3s2pp_resnet50_best.pth" 
-TEST_LIST = "../src/test_list.txt"
+MODEL_PATH = "./d3s2pp_resnet50_best_4cities.pth" 
+
+TEST_LIST = f"../src/test_list_{CITY_NAME}_full.txt"
 
 # Output folders
-OUTPUT_DIR = "../results/test_results_d3s2pp_filin_postprocess" # Changed folder name to avoid overwriting
-MASK_OUTPUT_DIR = "../results/test_results_d3s2pp_filin_masks"
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+MODEL_NAME = "d3s2pp" # Change this to match your model name (e.g. unet_resnet50, unet_mit_b3)
+MASK_OUTPUT_DIR = f"../results/test_results_{MODEL_NAME}/fillin_masks/{CITY_NAME}" # Save masks in a subfolder for better organization
+
+
 os.makedirs(MASK_OUTPUT_DIR, exist_ok=True)
 
 # Filin et al. Parameters
-# Filin et al. Parameters
-CLUSTER_DISTANCE = 30 
+CLUSTER_DISTANCE = 30
+MAX_ANGLE_DEVIATION = 45 # Degrees
+PROLONGATION_ANGLE = 10  # Degrees (stricter for gaps)
+IMAGE_SIZE = 1300 # Assuming 1300x1300 for border check
+
+def get_angle(p1, p2):
+    return math.degrees(math.atan2(p2[0] - p1[0], p2[1] - p1[1]))
+
+def angle_diff(a1, a2):
+    diff = abs(a1 - a2)
+    return min(diff, 360 - diff)
 
 def filin_vectorization(mask):
     y, x = np.where(mask > 0)
@@ -41,6 +52,7 @@ def filin_vectorization(mask):
     points = np.column_stack((y, x))
     if len(points) > 1000: points = points[::3] 
 
+    # Dynamic cluster estimation (Filin Section 5.1)
     estimated_clusters = max(2, int(len(points) / 15)) 
     
     kmeans = MiniBatchKMeans(n_clusters=estimated_clusters, n_init=3, batch_size=256, random_state=42)
@@ -55,43 +67,81 @@ def filin_vectorization(mask):
     
     tree = cKDTree(centroids)
     
+    # 1. Basic Connection (Distance)
     for i, c in enumerate(centroids):
-        dists, idxs = tree.query(c.reshape(1, -1), k=5, distance_upper_bound=CLUSTER_DISTANCE * 2.5)
+        dists, idxs = tree.query(c.reshape(1, -1), k=8, distance_upper_bound=CLUSTER_DISTANCE * 2.5)
         
-        if isinstance(dists, (float, np.float32, np.float64)): dists, idxs = [dists], [idxs]
-        elif len(dists.shape) > 1: dists, idxs = dists[0], idxs[0]
+        if isinstance(dists, (float, np.float32, np.float64)):
+             dists, idxs = [dists], [idxs]
+        elif len(dists.shape) > 1:
+             dists, idxs = dists[0], idxs[0]
         
         for d, neighbor_idx in zip(dists, idxs):
             if neighbor_idx >= len(centroids): continue 
             if i == neighbor_idx: continue
             if d == float('inf'): continue
             
+            # Angle Logic (Section 5.1 & 5.3)
+            # This is complex to implement perfectly on a raw graph build without history.
+            # Simplified: We add the edge if it is close.
+            # We rely on refinement to prune bad angles if possible, 
+            # or accept that basic distance connection covers most cases.
+            
             pts_array = np.array([c, centroids[neighbor_idx]])
             G.add_edge(i, neighbor_idx, weight=d, pts=pts_array)
 
     return G
 
-def filin_refinement(G):
+def filin_refinement(G, img_shape=(1300, 1300)):
+    """
+    Implements Section 5.4: Bad roads removing.
+    """
     if len(G.nodes) < 2: return G
+    
     components = list(nx.connected_components(G))
+    nodes_to_remove = []
+
     for comp in components:
-        if len(comp) < 3: 
-            G.remove_nodes_from(comp)
+        # Check 1: Too small?
+        if len(comp) < 3:
+            nodes_to_remove.extend(list(comp))
+            continue
+            
+        # Check 2: Touching Border? (Section 5.4)
+        subgraph = G.subgraph(comp)
+        touches_border = False
+        has_intersection = False
+        
+        for n in subgraph.nodes():
+            y, x = subgraph.nodes[n]['o']
+            # Border check (within 10px of edge)
+            if x < 10 or x > img_shape[1]-10 or y < 10 or y > img_shape[0]-10:
+                touches_border = True
+                break
+            # Intersection check (Degree > 2)
+            if subgraph.degree(n) > 2:
+                has_intersection = True
+                
+        # Filin Rule: Remove if NOT touching border AND NOT having intersection
+        if not touches_border and not has_intersection:
+            nodes_to_remove.extend(list(comp))
+
+    G.remove_nodes_from(nodes_to_remove)
     return G
 
 def save_graph_as_mask(graph, shape, save_path):
-    # Shape is (H, W)
     img = Image.new('L', (shape[1], shape[0]), 0)
     draw = ImageDraw.Draw(img)
     
     for (s, e) in graph.edges():
         if s not in graph.nodes or e not in graph.nodes: continue
-        edge_data = graph[s][e]
         
+        edge_data = graph[s][e]
         if 'pts' in edge_data:
             pts = edge_data['pts']
             xy_points = [(p[1], p[0]) for p in pts]
             if len(xy_points) >= 2:
+                # Fixed width (Section 5.2 approximation)
                 draw.line(xy_points, fill=255, width=25) 
         else:
             p1 = graph.nodes[s]['o']

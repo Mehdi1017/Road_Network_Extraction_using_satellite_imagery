@@ -84,6 +84,16 @@ python train.py --model mit_b3 --loss topo --batch_size 4
 # Resume a crashed or stopped training run
 python train.py --model mit_b3 --loss topo --resume
 ```
+### 4. Inference & Post-Processing
+The `predict.py` script handles model inference and applies specific topological repair heuristics (Filin et al., Li et al.) to the predicted masks. It can process a single image or an entire directory.
+
+**Basic Usage:**
+```bash
+python predict.py --test_list data/splits/test_list_AOI_5_Khartoum_full.txt \
+                  --model d3s2pp \
+                  --weights weights/d3s2pp_resnet50_best.pth \
+                  --post_process li \
+                  --threshold 0.5
 
 ## 📊 Results (Vegas)
 
