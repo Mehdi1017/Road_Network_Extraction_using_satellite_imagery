@@ -12,6 +12,6 @@ kaggel_scripts
 screenshots
 old
 logs
+*.Identifier
 structure.txt
-weights
 .gitignore

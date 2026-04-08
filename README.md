@@ -1,6 +1,6 @@
 # Road Network Detection and Route Travel Time Estimation from Satellite Imagery
 
-This repository contains the implementation of my Master's Thesis for the **Erasmus Mundus Master in Geospatial Technologies**. The project addresses the "Topology Gap" in automated road extraction by contrasting hierarchical Transformers against optimized CNN architectures.
+This repository contains the implementation of my Master's Thesis for the **Erasmus Mundus Master in Geospatial Technologies** https://run.unl.pt/entities/publication/061e3d4d-a3ae-45b7-97cc-bd90176abb5a. The project addresses the "Topology Gap" in automated road extraction by contrasting hierarchical Transformers against optimized CNN architectures.
 
 ## Key Highlights
 
@@ -8,6 +8,11 @@ This repository contains the implementation of my Master's Thesis for the **Eras
 * **Topological Repair:** Integrated geometric post-processing heuristics (Filin et al. & Li et al.) to ensure network connectivity.
 * **Advanced Evaluation:** Evaluation framework utilizing **APLS (Average Path Length Similarity)** and **Weisfeiler-Lehman (WL) Subtree Kernels** to measure structural isomorphism.
 
+Here is a visual comparison of our topological extraction pipeline:
+
+<p align="center">
+  <img src="doc_assets/example_road_extraction.png" alt="Road Extraction Example" width="800">
+</p>
 ## Methodology
 
 The pipeline consists of four main stages:
@@ -19,20 +24,44 @@ The pipeline consists of four main stages:
 
 ## Repository Structure
 
+## Repository Structure
+
 ```text
-├── models/             # SegFormer (MiT-B3) and DeepLabV3+ w/ D3S2PP
-├── post_processing/    # Heuristics for topology repair (Filin, Li)
-├── utils/              # Metrics: APLS, WL-Kernel, and IoU calculations
-├── weights/            # (Download links in README)
-├── samples/            # Sample imagery for quick-start inference
-├── main.py             # Training entry point
-└── predict.py          # Inference and vectorization script
+DeepRoad-Extraction/
+├── data/                       # Add to .gitignore
+│   ├── raw/                    # Raw SpaceNet 11-bit imagery & GeoJSON labels
+│   └── splits/                 # Dynamically generated train/val/test .txt lists
+│
+├── weights/                    # (Download links below)
+│   ├── d3s2pp_resnet50.pth 
+│   ├── unet_mit_b3.pth
+│   ├── unet_resnet50.pth
+│   ├── topo_d3s2pp_resnet50.pth
+│   ├── topo_unet_mit_b3.pth
+│   └── topo_unet_resnet50.pth
+│
+├── samples/                    # Sample imagery for quick-start testing
+│
+├── src/                        # Core Module Library
+│   ├── data_prep/              # Preprocessing and dataset splitting logic
+│   ├── models/                 # Architectures (SegFormer) and Custom Modules (D3S2PP)
+│   ├── losses/                 # Custom Topology-Aware loss functions
+│   ├── post_process/           # Vectorization & topological repair (Filin, Li)
+│   └── utils/                  # Evaluation metrics (APLS, WL-Kernel, IoU)
+│
+├── train.py                    # Master entry point for model training
+├── predict.py                  # Master entry point for inference & post-processing
+├── evaluate.py                 # Master entry point for cross-city topological evaluation
+├── requirements.txt            # Python dependencies
+└── README.md                   # Project documentation
 ```
 
 ## Quick Start
 
+Get up and running in under two minutes using the provided sample data.
+
+**1. Clone and Configure**
 ```bash
-# Clone the repository
 git clone https://github.com/Mehdi1017/Road_Network_Extraction_using_satellite_imagery.git
 cd Road_Network_Extraction_using_satellite_imagery
 
@@ -42,10 +71,25 @@ source venv/bin/activate  # On Windows use: venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
-
-# Run inference on a sample image
-python predict.py --input samples/mumbai_sample.tif --model mit_b3
 ```
+
+**2. Download Pre-trained Weights**
+Download the pre-trained `.pth` files from the [Releases page](https://github.com/Mehdi1017/Road_Network_Extraction_using_satellite_imagery/releases/tag/segmentation_models) and place them directly into the `weights/` directory.
+
+**3. Run Inference on Sample Data**
+To verify your setup, run the prediction script on the included sample data using the SegFormer model and morphological post-processing:
+
+```bash
+# Assuming you created a small test list for the samples folder
+python predict.py \
+    --test_list samples/sample_list.txt \
+    --model mit_b3 \
+    --weights weights/unet_mit_b3_best.pth \
+    --post_process morpho
+```
+
+*(Note: The prediction will be saved in `results/mit_b3/morpho_masks/samples/`)*
+
 ## Usage Guide
 
 This repository uses modular entry-point scripts. You can see all available arguments for any script by passing the `--help` flag (e.g., `python train.py --help`).
@@ -108,7 +152,7 @@ python evaluate.py --model d3s2pp --post_process li
 python evaluate.py --model resnet50 --post_process none
 
 ```
-## Results (Vegas)
+## Results example (Vegas no postprocess)
 
 | Model | IoU | APLS | WL-Kernel | APLS_Time |
 | :--- | :---: | :---: | :---: | :---: |
