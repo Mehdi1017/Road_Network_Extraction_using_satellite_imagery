@@ -1,0 +1,2 @@
+data/raw/AOI_2_Vegas/PS-RGB/SN3_roads_train_AOI_2_Vegas_PS-RGB_img10.tif
+data/raw/AOI_2_Vegas/PS-RGB/SN3_roads_train_AOI_2_Vegas_PS-RGB_img126.tif
