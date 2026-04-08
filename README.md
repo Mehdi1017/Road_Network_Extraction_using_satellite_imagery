@@ -95,6 +95,19 @@ python predict.py --test_list data/splits/test_list_AOI_5_Khartoum_full.txt \
                   --post_process li \
                   --threshold 0.5
 ```
+
+### 5. Advanced Evaluation & Metrics
+The `evaluate.py` script automatically compares ground truth masks against your predictions across all available test cities. It calculates standard spatial metrics (IoU) alongside advanced topological algorithms, including Average Path Length Similarity (APLS) weighted by routing time, and Weisfeiler-Lehman (WL) Subtree Kernels.
+
+**Basic Usage:**
+```bash
+# Evaluate a specific model and post-processing combination across all cities
+python evaluate.py --model d3s2pp --post_process li
+
+# Evaluate the baseline CNN
+python evaluate.py --model resnet50 --post_process none
+
+```
 ## Results (Vegas)
 
 | Model | IoU | APLS | WL-Kernel | APLS_Time |
