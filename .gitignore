@@ -1,13 +1,9 @@
-AOI_2_Vegas
 results
-AOI_2_Vegas_Roads_Test_Public
 test_results
 related_papers/
 venv/
 __pycache__/
 *.pth
-*.tif
-*.tiff
 *.geojson
 *.shp
 debug
@@ -18,4 +14,4 @@ old
 logs
 structure.txt
 weights
-*.gitignore
+.gitignore
